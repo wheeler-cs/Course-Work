@@ -1,10 +1,6 @@
 import csv
-from tkinter import Label
-import keras
 import numpy as np
-from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import LabelEncoder
-import tensorflow as tf
+from sklearn.neural_network import MLPClassifier
 
 
 class RNN(object):
@@ -43,33 +39,27 @@ class RNN(object):
         for line in dataLines:
             labels.append(line[0])
             data.append(line[1:])
-        allXData = np.array(data).astype("int")
-        allYData = np.array(labels).astype("int")
-        # One-hot encode
-        enc = LabelEncoder()
-        enc.fit(np.unique(allXData))
-        self.uniqueElements = len(np.unique(allXData))
-        for x in allXData:
-            x = enc.transform(x)
-        # Convert arrays to tensors
-        self.xTrain = tf.convert_to_tensor(allXData[:28000], dtype=tf.int64)
-        self.yTrain = tf.convert_to_tensor(allYData[:28000], dtype=tf.int64)
-        self.xTest  = tf.convert_to_tensor(allXData[28000:], dtype=tf.int64)
-        self.yTest  = tf.convert_to_tensor(allYData[28000:], dtype=tf.int64)
+        self.xTrain = data[:28000]
+        self.yTrain = labels[:28000]
+        self.xTest = data[28000:]
+        self.yTest = labels[28000:]
+        self.xTrain = np.array(self.xTrain).astype("int")
+        self.yTrain = np.array(self.yTrain).astype("int")
+        self.xTest = np.array(self.xTest).astype("int")
+        self.yTest = np.array(self.yTest).astype("int")
+        #allXData = np.array(data).astype("int")
+        #allYData = np.array(labels).astype("int")
 
-
-    def initModel(self) -> None:
-        self.model = keras.Sequential()
-        self.model.add(keras.Input(shape=(9,), dtype=tf.int64))
-        self.model.add(keras.layers.Embedding(input_dim=self.uniqueElements, output_dim=512))
-        self.model.add(keras.layers.LSTM(512))
-        self.model.add(keras.layers.Dense(256))
-        self.model.add(keras.layers.Dense(1))
-        self.model.compile(loss=keras.losses.binary_crossentropy, optimizer="Adam", metrics=["accuracy", keras.metrics.AUC(dtype=tf.int64), keras.metrics.FalsePositives(dtype=tf.int64)])
-        self.model.fit(x=self.xTrain, y=self.yTrain, batch_size=150, epochs=1)
-        self.model.evaluate(x=self.xTest, y=self.yTest)
+        classifier = MLPClassifier(solver="lbfgs", alpha=1e-5, hidden_layer_sizes=(5, 2), random_state=1)
+        classifier.fit(self.xTrain, self.yTrain)
+        predictions = classifier.predict(self.xTest)
+        count = 0
+        for p in enumerate(predictions):
+            if (p[1] != self.yTest[p[0]]):
+                count += 1
+        print(count)
+        print(len(predictions))
 
 
 if __name__ == "__main__":
     recurrNN = RNN("data/train.csv")
-    recurrNN.initModel()
