@@ -53,12 +53,23 @@ class DeepNeuralNetwork(object):
     def initializeModel(self) -> None:
         # Create the layers of the model
         self.model = keras.Sequential([
-            keras.layers.Dense(units=1, input_shape=self.datasetShape)
+            keras.layers.Dense(64, activation="gelu"),
+            keras.layers.Dense(16),
+            keras.layers.Dense(32),
+            keras.layers.Dense(64, activation="leaky_relu"),
+            keras.layers.Dense(32),
+            keras.layers.Dense(16),
+            keras.layers.Dense(16),
+            keras.layers.Dense(8),
+            keras.layers.Dense(4),
+            keras.layers.Dense(units=1, input_shape=self.datasetShape, activation="sigmoid")
         ])
+        # Compile to allow for training
         self.model.compile(optimizer="adam", loss="mean_squared_error", metrics=["f1_score", "false_positives", "true_negatives"])
 
 
     def trainModel(self) -> None:
+        # Train the model, recording the results
         self.trainResults = self.model.fit(self.trainData, self.trainLabels, validation_data=(self.validateData, self.validateLabels), batch_size=64, epochs=10)
 
 
@@ -70,7 +81,7 @@ class DeepNeuralNetwork(object):
         self.falsePositiveRate = self.falsePositives / (self.falsePositives + self.trueNegatives)
 
 
-    def __str__(self) -> None:
+    def __str__(self) -> str:
         return (f"F1-Score: {self.f1Score}" +
                 f"\nFP Count: {self.falsePositives}" +
                 f"\nTN Count: {self.trueNegatives}" +
