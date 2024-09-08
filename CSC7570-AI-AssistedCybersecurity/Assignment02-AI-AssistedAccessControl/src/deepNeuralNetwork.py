@@ -4,9 +4,6 @@ import pandas as pd
 from sys import argv
 import tensorflow as tf
 
-# --- Constants --------------------------------------------------------------------------------------------------------
-
-
 # --- DeepNeuralNetwork Class ------------------------------------------------------------------------------------------
 class DeepNeuralNetwork(object):
     def __init__(self) -> None:
