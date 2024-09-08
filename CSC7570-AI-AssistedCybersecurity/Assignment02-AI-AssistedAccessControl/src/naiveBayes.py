@@ -1,3 +1,4 @@
+from decimal import DivisionByZero
 import numpy as np
 import pandas as pd
 from sklearn.naive_bayes import MultinomialNB
@@ -31,7 +32,17 @@ class NaiveBayes(object):
         dataFrame = pd.read_csv(fileName)
         dataFrame.head()
 
-        # One-hot encode everything except the ACTION column
+        # Remove certain columns to improve model
+        # NOTE: Dropping these columns may not _really_ improve model performance, but a quick evaluation does show some
+        # positive benefit to doing so. Ultimately, the problem this dataset applies to is hard to solve, and there are
+        # **HUGE** number of possible combinations for dropping features that may boost how well a model does.
+        dataFrame = dataFrame.drop("ROLE_DEPTNAME", axis=1)
+        dataFrame = dataFrame.drop("ROLE_TITLE", axis=1)
+        dataFrame = dataFrame.drop("ROLE_FAMILY_DESC", axis=1)
+        dataFrame = dataFrame.drop("ROLE_FAMILY", axis=1)
+        dataFrame = dataFrame.drop("ROLE_CODE", axis=1)
+
+        # One-hot encode everything except the ACTION column (using two-category categorical classification)
         dataFrame = pd.get_dummies(dataFrame, columns=dataFrame.columns[1:])
 
         # Split the data 80-20 training and validation
@@ -58,6 +69,12 @@ class NaiveBayes(object):
 
     
     def generateStatistics(self) -> None:
+        # This variable is initialized when a model is trained and then predicted using the validation set
+        if(self.trainResults is None):
+            print("[ERR] Please initialize and train model before generating performance statistics!")
+            raise(ValueError)
+    
+        # Result values in counter variables for new counter iteration
         self.truePositives = 0
         self.falsePositives = 0
         self.trueNegatives = 0
@@ -66,28 +83,38 @@ class NaiveBayes(object):
         for result in enumerate(self.validateLabels):
             # Obtained a negative in testing
             if(result[1] == 0):
+                # True negative
                 if self.trainResults[result[0]] == 0:
                     self.trueNegatives += 1
+                # False negative
                 else:
                     self.falseNegatives += 1
             # Obtained a positive in testing
             elif(result[1] == 1):
+                # False positive
                 if self.trainResults[result[0]] == 0:
                     self.falsePositives += 1
+                # True positive
                 else:
                     self.truePositives += 1
         
-        # Calculate FPR
-        self.falsePositiveRate = self.falsePositives / (self.falsePositives + self.trueNegatives)
+        try:
+            # Calculate FPR
+            self.falsePositiveRate = self.falsePositives / (self.falsePositives + self.trueNegatives)
 
-        # Calculate F1 score
-        recall = self.truePositives / (self.truePositives + self.falseNegatives)
-        precision = self.truePositives / (self.truePositives + self.falsePositives)
-        self.f1Score = (2 * precision * recall) / (precision + recall)
+            # Calculate F1 score
+            recall = self.truePositives / (self.truePositives + self.falseNegatives)
+            precision = self.truePositives / (self.truePositives + self.falsePositives)
+            self.f1Score = (2 * precision * recall) / (precision + recall)
+        except(DivisionByZero):
+            # Theoretically, this should only occur if training wasn't performed and the pos-neg values are still 0
+            print("[ERR] Please make sure model is trained before attempting to generate statistics!")
+            raise(DivisionByZero)
 
     
     
     def __str__(self) -> str:
+        # Treat printing as an output of the performance of the model after evaluation
         return (f"F1-Score: {self.f1Score}" +
                 f"\nFP Count: {self.falsePositives}" +
                 f"\nTN Count: {self.trueNegatives}" +
