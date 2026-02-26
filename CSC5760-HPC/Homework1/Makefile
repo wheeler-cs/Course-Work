@@ -1,6 +1,6 @@
 CC=mpicc
 
-all: problem1 problem2 problem3 problem4 problemg1
+all: problem1 problem2 problem3 problem4 problem5 problemg1
 
 problem1: problem1.c problem1main.c problem1.h
 	$(CC) problem1.c problem1main.c -o problem1
@@ -34,6 +34,13 @@ runp4:
 	mpirun -np 4 ./problem4 100000
 # == End LLM-generated code ==
 
+problem5: problem5main.c
+	$(CC) problem5main.c -o problem5
+
+.PHONY: runp5
+runp5:
+	mpirun -np 8 ./problem5
+
 problemg1: problemg1main.c problemg1.c problemg1.h Terminal.c Terminal.h
 	$(CC) problemg1main.c problemg1.c Terminal.c -o problemg1
 
@@ -43,4 +50,5 @@ clean:
 	rm ./problem2
 	rm ./problem3
 	rm ./problem4
+	rm ./problem5
 	rm ./problemg1
