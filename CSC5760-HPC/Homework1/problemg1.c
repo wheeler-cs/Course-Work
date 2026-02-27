@@ -1,6 +1,138 @@
 #include "problemg1.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+
+struct ProcessMap * initProcMap(int p, int q)
+{
+    // Allocate memory
+    struct ProcessMap * pMap;
+    pMap = malloc(sizeof(struct ProcessMap));
+
+    // Calculate sizes
+    pMap->rows      = WORLD_HEIGHT / P;
+    pMap->extraRows = WORLD_HEIGHT % P;
+    pMap->cols      = WORLD_WIDTH  / Q;
+    pMap->extraCols = WORLD_WIDTH  % Q; 
+}
+
+void deallocProcMap(struct ProcessMap * pMap)
+{
+    free(pMap);
+    pMap = NULL;
+}
+
+void initProcChunkInfo(struct ProcessChunkInfo * pChunkInfo)
+{
+    pChunkInfo->rowStart = 0;
+    pChunkInfo->rowEnd = 0;
+    pChunkInfo->rowRange = 0;
+    pChunkInfo->colStart = 0;
+    pChunkInfo->colEnd = 0;
+    pChunkInfo->colRange = 0;
+}
+
+struct ProcessChunkInfo calcBoundaries(int rank, struct ProcessMap * pMap)
+{
+    struct ProcessChunkInfo pChunkInfo;
+    int procMapRow, procMapCol;
+    procMapRow = rank / Q;
+    procMapCol = rank % Q;
+
+    // Calculate row and column range
+    pChunkInfo.rowRange = pMap->rows;
+    if(procMapRow < pMap->extraRows)
+    {
+        pChunkInfo.rowRange += 1;
+    }
+    pChunkInfo.colRange = pMap->cols;
+    if(procMapCol < pMap->extraCols)
+    {
+        pChunkInfo.colRange += 1;
+    }
+    // Calculate row start
+    pChunkInfo.rowStart = procMapRow * pMap->rows;
+    if(procMapRow < pMap->extraRows)
+    {
+        pChunkInfo.rowStart += procMapRow;
+    }
+    else
+    {
+        pChunkInfo.rowStart += pMap->extraRows;
+    }
+    // Calculate column start
+    pChunkInfo.colStart = procMapCol * pMap->cols;
+    if(procMapCol < pMap->extraCols)
+    {
+        pChunkInfo.colStart += procMapCol;
+    }
+    else
+    {
+        pChunkInfo.colStart += pMap->extraCols;
+    }
+    // Calculate row and column end
+    pChunkInfo.rowEnd = (pChunkInfo.rowStart + pChunkInfo.rowRange) % WORLD_HEIGHT;
+    pChunkInfo.colEnd = (pChunkInfo.colStart + pChunkInfo.colRange) % WORLD_WIDTH;
+
+    return pChunkInfo;
+}
+
+int * flattenMap(int world[WORLD_WIDTH][WORLD_HEIGHT])
+{
+    int * flatWorld, i, j;
+    flatWorld = malloc(sizeof(int) * WORLD_HEIGHT * WORLD_WIDTH);
+    // Convert 2-D world into 1-D array
+    for(i = 0; i < WORLD_HEIGHT; i++)
+    {
+        for(j = 0; j < WORLD_WIDTH; j++)
+        {
+            flatWorld[i * WORLD_WIDTH + j] = world[i][j];
+        }
+    }
+
+    return flatWorld;
+}
+
+void calcDisplCounts(int * sendCounts, int * displacements, struct ProcessMap * pMap)
+{
+    int i,
+        localRow, localCol,
+        globalRow, globalCol;
+
+    sendCounts = malloc(sizeof(int) * P * Q);
+    displacements = malloc(sizeof(int) * P * Q);
+
+    for(int i = 0; i < P * Q; i++) {
+        globalRow = i / Q;
+        globalCol = i % Q;
+
+        localRow = pMap->rows;
+        if(globalRow < pMap->extraRows)
+        {
+            localRow += 1;
+        };
+        localCol = pMap->cols;
+        if(globalCol < pMap->extraCols)
+        {
+            localCol += 1;
+        }
+
+        sendCounts[i] = localRow * localCol;
+
+        int rowStart = globalRow * pMap->rows;
+        if(globalRow < pMap->extraRows)
+        {
+            rowStart += globalRow;
+        }
+        else
+        {
+            rowStart += pMap->extraRows;
+        }
+        int colStart = globalCol * pMap->cols + (globalCol < pMap->extraCols ? globalCol : pMap->extraCols);
+
+        displacements[i] = rowStart * pMap->cols + colStart;
+    }
+}
 
 void initWorld(int world[WORLD_WIDTH][WORLD_HEIGHT])
 {
@@ -78,6 +210,15 @@ void beaconDemo(int world[WORLD_WIDTH][WORLD_HEIGHT])
     world[2][3] = STATE_ALIVE;
     world[3][3] = STATE_ALIVE;
     world[3][2] = STATE_ALIVE;
+}
+
+void gliderDemo(int world[WORLD_WIDTH][WORLD_HEIGHT])
+{
+    world[2][2] = STATE_ALIVE;
+    world[3][2] = STATE_ALIVE;
+    world[4][2] = STATE_ALIVE;
+    world[4][3] = STATE_ALIVE;
+    world[3][4] = STATE_ALIVE;
 }
 
 void updateWorld(int world[WORLD_WIDTH][WORLD_HEIGHT])

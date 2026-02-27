@@ -1,6 +1,6 @@
 CC=mpicc
 
-all: problem1 problem2 problem3 problem4 problem5 problemg1
+all: problem1 problem2 problem3 problem4 problem5 problem6 problemg1
 
 problem1: problem1.c problem1main.c problem1.h
 	$(CC) problem1.c problem1main.c -o problem1
@@ -41,8 +41,19 @@ problem5: problem5main.c
 runp5:
 	mpirun -np 8 ./problem5
 
+problem6: problem6main.c
+	$(CC) problem6main.c -o problem6
+
+.PHONY: runp6
+runp6:
+	mpirun -np 8 ./problem6
+
 problemg1: problemg1main.c problemg1.c problemg1.h Terminal.c Terminal.h
 	$(CC) problemg1main.c problemg1.c Terminal.c -o problemg1
+
+.PHONY: runpg1
+runpg1:
+	mpirun -np 8 ./problemg1
 
 .PHONY: clean
 clean:
@@ -51,4 +62,5 @@ clean:
 	rm ./problem3
 	rm ./problem4
 	rm ./problem5
+	rm ./problem6
 	rm ./problemg1
