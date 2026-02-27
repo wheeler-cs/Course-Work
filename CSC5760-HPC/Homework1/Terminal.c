@@ -11,7 +11,7 @@ void clearScreen()
 void moveCursorUp(unsigned int lines)
 {
     printf("\33[%dA", lines);
-};
+}
 
 void moveCursorDown(unsigned int lines)
 {

@@ -3,136 +3,79 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-struct ProcessMap * initProcMap(int p, int q)
+struct Allocations * initAllocationMap(int p, int q)
 {
     // Allocate memory
+    struct Allocations * allocMap;
+    allocMap = malloc(sizeof(struct Allocations));
+
+    // Calculate sizes
+    allocMap->rows      = WORLD_HEIGHT / p;
+    allocMap->extraRows = WORLD_HEIGHT % p;
+    allocMap->cols      = WORLD_WIDTH  / q;
+    allocMap->extraCols = WORLD_WIDTH  % q; 
+
+    return allocMap;
+}
+
+void deallocAllocationMap(struct Allocations * allocMap)
+{
+    free(allocMap);
+    allocMap = NULL;
+}
+
+struct ProcessMap * initProcMap()
+{
     struct ProcessMap * pMap;
     pMap = malloc(sizeof(struct ProcessMap));
 
-    // Calculate sizes
-    pMap->rows      = WORLD_HEIGHT / P;
-    pMap->extraRows = WORLD_HEIGHT % P;
-    pMap->cols      = WORLD_WIDTH  / Q;
-    pMap->extraCols = WORLD_WIDTH  % Q; 
-}
-
-void deallocProcMap(struct ProcessMap * pMap)
-{
-    free(pMap);
-    pMap = NULL;
-}
-
-void initProcChunkInfo(struct ProcessChunkInfo * pChunkInfo)
-{
-    pChunkInfo->rowStart = 0;
-    pChunkInfo->rowEnd = 0;
-    pChunkInfo->rowRange = 0;
-    pChunkInfo->colStart = 0;
-    pChunkInfo->colEnd = 0;
-    pChunkInfo->colRange = 0;
-}
-
-struct ProcessChunkInfo calcBoundaries(int rank, struct ProcessMap * pMap)
-{
-    struct ProcessChunkInfo pChunkInfo;
-    int procMapRow, procMapCol;
-    procMapRow = rank / Q;
-    procMapCol = rank % Q;
-
-    // Calculate row and column range
-    pChunkInfo.rowRange = pMap->rows;
-    if(procMapRow < pMap->extraRows)
+    int i, j;
+    for(i = 0; i < P; i++)
     {
-        pChunkInfo.rowRange += 1;
-    }
-    pChunkInfo.colRange = pMap->cols;
-    if(procMapCol < pMap->extraCols)
-    {
-        pChunkInfo.colRange += 1;
-    }
-    // Calculate row start
-    pChunkInfo.rowStart = procMapRow * pMap->rows;
-    if(procMapRow < pMap->extraRows)
-    {
-        pChunkInfo.rowStart += procMapRow;
-    }
-    else
-    {
-        pChunkInfo.rowStart += pMap->extraRows;
-    }
-    // Calculate column start
-    pChunkInfo.colStart = procMapCol * pMap->cols;
-    if(procMapCol < pMap->extraCols)
-    {
-        pChunkInfo.colStart += procMapCol;
-    }
-    else
-    {
-        pChunkInfo.colStart += pMap->extraCols;
-    }
-    // Calculate row and column end
-    pChunkInfo.rowEnd = (pChunkInfo.rowStart + pChunkInfo.rowRange) % WORLD_HEIGHT;
-    pChunkInfo.colEnd = (pChunkInfo.colStart + pChunkInfo.colRange) % WORLD_WIDTH;
-
-    return pChunkInfo;
-}
-
-int * flattenMap(int world[WORLD_WIDTH][WORLD_HEIGHT])
-{
-    int * flatWorld, i, j;
-    flatWorld = malloc(sizeof(int) * WORLD_HEIGHT * WORLD_WIDTH);
-    // Convert 2-D world into 1-D array
-    for(i = 0; i < WORLD_HEIGHT; i++)
-    {
-        for(j = 0; j < WORLD_WIDTH; j++)
+        for(j = 0; j < Q; j++)
         {
-            flatWorld[i * WORLD_WIDTH + j] = world[i][j];
+            pMap->map[i][j] = (i * Q) + j;
         }
     }
 
-    return flatWorld;
+    return pMap;
 }
 
-void calcDisplCounts(int * sendCounts, int * displacements, struct ProcessMap * pMap)
+
+struct NeighborRanks * calcNeighbors(int rank, struct ProcessMap * pMap)
 {
-    int i,
-        localRow, localCol,
-        globalRow, globalCol;
+    int i, j, selfi, selfj;
+    struct NeighborRanks * neighbors;
 
-    sendCounts = malloc(sizeof(int) * P * Q);
-    displacements = malloc(sizeof(int) * P * Q);
-
-    for(int i = 0; i < P * Q; i++) {
-        globalRow = i / Q;
-        globalCol = i % Q;
-
-        localRow = pMap->rows;
-        if(globalRow < pMap->extraRows)
+    // Find rank's position in process map
+    for(i = 0; i < P; i++)
+    {
+        for(j = 0; j < Q; j++)
         {
-            localRow += 1;
-        };
-        localCol = pMap->cols;
-        if(globalCol < pMap->extraCols)
-        {
-            localCol += 1;
+            if(pMap->map[i][j] == rank)
+            {
+                selfi = i;
+                selfj = j;
+                i = P;
+                break;
+            }
         }
-
-        sendCounts[i] = localRow * localCol;
-
-        int rowStart = globalRow * pMap->rows;
-        if(globalRow < pMap->extraRows)
-        {
-            rowStart += globalRow;
-        }
-        else
-        {
-            rowStart += pMap->extraRows;
-        }
-        int colStart = globalCol * pMap->cols + (globalCol < pMap->extraCols ? globalCol : pMap->extraCols);
-
-        displacements[i] = rowStart * pMap->cols + colStart;
     }
+
+    // Find neighboring processes (clockwise order from top left corner)
+    neighbors = malloc(sizeof(struct NeighborRanks));
+    neighbors->nw = pMap->map[((selfi + P) - 1) % P][((selfj + Q) - 1) % Q];
+    neighbors->n  = pMap->map[((selfi + P) - 1) % P][selfj];
+    neighbors->ne = pMap->map[((selfi + P) - 1) % P][(selfj + 1) % Q];
+    neighbors->e  = pMap->map[selfi][(selfj + 1) % Q];
+    neighbors->se = pMap->map[(selfi + 1) % P][(selfj + 1) % Q];
+    neighbors->s  = pMap->map[(selfi + 1) % P][selfj];
+    neighbors->sw = pMap->map[(selfi + 1) % P][((selfj + Q) - 1) % Q];
+    neighbors->w  = pMap->map[selfi][((selfj + Q) - 1) % Q];
+
+    return neighbors;
 }
+
 
 void initWorld(int world[WORLD_WIDTH][WORLD_HEIGHT])
 {

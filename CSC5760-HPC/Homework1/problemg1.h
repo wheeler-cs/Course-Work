@@ -1,6 +1,8 @@
 #ifndef _PROBLEMG1_H
 #define _PROBLEMG1_H
 
+#define DEBUG
+
 #define WORLD_WIDTH 10
 #define WORLD_HEIGHT 10
 
@@ -14,13 +16,33 @@ enum CellState
     STATE_ALIVE,
 };
 
-struct ProcessMap
+struct Allocations
 {
     int rows,
         extraRows,
         cols,
         extraCols;
 };
+
+struct Allocations * initAllocationMap(int, int);
+void deallocAllocationMap(struct Allocations *);
+
+
+struct ProcessMap
+{
+    int map[P][Q];
+};
+
+struct ProcessMap * initProcMap();
+
+
+struct NeighborRanks
+{
+    int n, s, e, w, ne, nw, se, sw;
+};
+
+struct NeighborRanks * calcNeighbors(int, struct ProcessMap *);
+
 
 struct ProcessChunkInfo
 {
@@ -32,12 +54,7 @@ struct ProcessChunkInfo
         colRange;
 };
 
-struct ProcessMap * initProcMap(int, int);
-void deallocProcMap(struct ProcessMap *);
-void initProcChunkInfo(struct ProcessChunkInfo *);
-struct ProcessChunkInfo calcBoundaries(int, struct ProcessMap *);
-int * flattenMap(int [WORLD_WIDTH][WORLD_HEIGHT]);
-void calcDisplCounts(int *, int *, struct ProcessMap *);
+
 void initWorld(int [WORLD_WIDTH][WORLD_HEIGHT]);
 int isCellAlive(int, int, int [WORLD_WIDTH][WORLD_HEIGHT]);
 void blinkerDemo(int [WORLD_WIDTH][WORLD_HEIGHT]);

@@ -49,7 +49,7 @@ runp6:
 	mpirun -np 8 ./problem6
 
 problemg1: problemg1main.c problemg1.c problemg1.h Terminal.c Terminal.h
-	$(CC) problemg1main.c problemg1.c Terminal.c -o problemg1
+	$(CC) -Wall -Wextra -pedantic problemg1main.c problemg1.c Terminal.c -o problemg1
 
 .PHONY: runpg1
 runpg1:
