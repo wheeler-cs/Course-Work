@@ -1,5 +1,6 @@
 #include "problemg1.h"
 
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -131,11 +132,13 @@ struct ChunkHalos * initHalos(int rowRange, int colRange)
     halos->nHaloSize = colRange;
     halos->sHaloSize = colRange;
 
-    // Allocation memroy for halos
+    // Allocate memory for halos
+    // Corners are 1-D arrays
     halos->eHalo  = malloc(sizeof(int) * halos->eHaloSize);
     halos->wHalo  = malloc(sizeof(int) * halos->wHaloSize);
     halos->nHalo  = malloc(sizeof(int) * halos->nHaloSize);
     halos->sHalo  = malloc(sizeof(int) * halos->sHaloSize);
+    // Cardinal directions are scalars
     halos->neHalo = malloc(sizeof(int));
     halos->nwHalo = malloc(sizeof(int));
     halos->seHalo = malloc(sizeof(int));
@@ -156,6 +159,69 @@ void deallocHalos(struct ChunkHalos * halos)
     free(halos->swHalo);
     free(halos);
     halos = NULL;
+}
+
+void exchangeHalos(int ** subWorld, struct ChunkHalos * halos, struct NeighborRanks * neighbors)
+{
+    // Create buffers for sending data
+    MPI_Request requests[16];
+    int * toNBuffer,
+        * toSBuffer,
+        * toEBuffer,
+        * toWBuffer;
+    int i;
+    toNBuffer = malloc(sizeof(int) * halos->nHaloSize);
+    toSBuffer = malloc(sizeof(int) * halos->sHaloSize);
+    toEBuffer = malloc(sizeof(int) * halos->eHaloSize);
+    toWBuffer = malloc(sizeof(int) * halos->wHaloSize);
+
+    // Initiate asynchornous receive first
+    MPI_Irecv(halos->nHalo,  halos->nHaloSize, MPI_INT, neighbors->n,  TAG_NORTH,     MPI_COMM_WORLD, &requests[0]);
+    MPI_Irecv(halos->sHalo,  halos->sHaloSize, MPI_INT, neighbors->s,  TAG_SOUTH,     MPI_COMM_WORLD, &requests[1]);
+    MPI_Irecv(halos->eHalo,  halos->eHaloSize, MPI_INT, neighbors->e,  TAG_EAST,      MPI_COMM_WORLD, &requests[2]);
+    MPI_Irecv(halos->wHalo,  halos->wHaloSize, MPI_INT, neighbors->w,  TAG_WEST,      MPI_COMM_WORLD, &requests[3]);
+    MPI_Irecv(halos->neHalo, 1,                MPI_INT, neighbors->ne, TAG_NORTHEAST, MPI_COMM_WORLD, &requests[4]);
+    MPI_Irecv(halos->nwHalo, 1,                MPI_INT, neighbors->nw, TAG_NORTHWEST, MPI_COMM_WORLD, &requests[5]);
+    MPI_Irecv(halos->seHalo, 1,                MPI_INT, neighbors->se, TAG_SOUTHEAST, MPI_COMM_WORLD, &requests[6]);
+    MPI_Irecv(halos->swHalo, 1,                MPI_INT, neighbors->sw, TAG_SOUTHWEST, MPI_COMM_WORLD, &requests[7]);
+
+    // Copy data from chunk to buffers
+    for(i = 0; i < halos->nHaloSize; i++)
+    {
+        toNBuffer[i] = subWorld[0][i];
+    }
+    for(i = 0; i < halos->sHaloSize; i++)
+    {
+        toSBuffer[i] = subWorld[halos->eHaloSize - 1][i];
+    }
+    for(i = 0; i < halos->eHaloSize; i++)
+    {
+        toEBuffer[i] = subWorld[i][halos->sHaloSize];
+    }
+    for(i = 0; i < halos->wHaloSize; i++)
+    {
+        toWBuffer[i] = subWorld[i][0];
+    }
+
+    // Send data to neighbors
+    // NOTE: Tag is opposite direction of where halo goes
+    MPI_Isend(toNBuffer, halos->nHaloSize, MPI_INT, neighbors->n, TAG_SOUTH, MPI_COMM_WORLD, &requests[8]);
+    MPI_Isend(toSBuffer, halos->sHaloSize, MPI_INT, neighbors->s, TAG_NORTH, MPI_COMM_WORLD, &requests[9]);
+    MPI_Isend(toEBuffer, halos->eHaloSize, MPI_INT, neighbors->e, TAG_WEST,  MPI_COMM_WORLD, &requests[10]);
+    MPI_Isend(toWBuffer, halos->wHaloSize, MPI_INT, neighbors->w, TAG_EAST,  MPI_COMM_WORLD, &requests[11]);
+    MPI_Isend(&subWorld[0][0],                               1, MPI_INT, neighbors->nw, TAG_SOUTHEAST, MPI_COMM_WORLD, &requests[12]);
+    MPI_Isend(&subWorld[0][halos->nHaloSize],                1, MPI_INT, neighbors->ne, TAG_SOUTHWEST, MPI_COMM_WORLD, &requests[13]);
+    MPI_Isend(&subWorld[halos->eHaloSize][halos->nHaloSize], 1, MPI_INT, neighbors->se, TAG_NORTHWEST, MPI_COMM_WORLD, &requests[14]);
+    MPI_Isend(&subWorld[halos->eHaloSize][0],                1, MPI_INT, neighbors->sw, TAG_NORTHEAST, MPI_COMM_WORLD, &requests[15]);
+
+    // Wait for send to finish
+    MPI_Waitall(16, requests, MPI_STATUSES_IGNORE);
+
+    // Free dynamic memory
+    free(toNBuffer);
+    free(toSBuffer);
+    free(toEBuffer);
+    free(toWBuffer);
 }
 
 

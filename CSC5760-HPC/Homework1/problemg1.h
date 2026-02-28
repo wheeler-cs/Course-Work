@@ -12,6 +12,18 @@
 
 #define ITERATIONS 10
 
+enum ReceiveTag
+{
+    TAG_NORTH,
+    TAG_SOUTH,
+    TAG_EAST,
+    TAG_WEST,
+    TAG_NORTHEAST,
+    TAG_NORTHWEST,
+    TAG_SOUTHEAST,
+    TAG_SOUTHWEST,
+};
+
 enum CellState
 {
     STATE_DEAD,
@@ -73,6 +85,7 @@ struct ChunkHalos
 
 struct ChunkHalos * initHalos(int, int);
 void deallocHalos(struct ChunkHalos *);
+void exchangeHalos(int **, struct ChunkHalos *, struct NeighborRanks *);
 
 
 // Code for Game of Life logic

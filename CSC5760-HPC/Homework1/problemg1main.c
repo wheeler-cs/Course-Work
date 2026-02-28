@@ -21,15 +21,15 @@
  * pthreads, and that's the extent of my knowledge about parallel computing.
  * 
  * I genuinely put my best effort into writing this program, but I've had course
- * projects with fewer lines of source code than what I've put in here. I just
- * wish there had been a more gradual introduction to MPI, and that the lectures
- * had gone into more detail about what each function does and how it works.
- * Some smaller  * code examples that we could pull from would also have been
+ * semester projects with fewer lines of source code than what I've put in here.
+ * I just wish there had been a more gradual introduction to MPI, and that the
+ * lectures had gone into more detail about what each function does and how it
+ * works.Some smaller code examples that we could pull from would also have been
  * helpful. While the examples provided do have valuable information, they are
  * monolithic and pretty intimidating to break down.
  * 
  * Again, I'm typically not the person who complains about an assignment, but
- * I think this was a bit much for the first one of the semester.
+ * I think this was excessive for the first one of the semester.
  */
 
 int main(int argc, char ** argv)
@@ -96,12 +96,15 @@ int main(int argc, char ** argv)
     // Run game for n iterations
     for(i = 0; i < ITERATIONS; i++)
     {
+        exchangeHalos(subWorld, halos, neighbors);
+
         // Update world if rank 0
         if(rank == 0)
         {
             world[0][0] = 1;
-            i = world[0][0];
+            printWorld(world);
         }
+        sleep(0.5);
     }
 
     // Cleanup
