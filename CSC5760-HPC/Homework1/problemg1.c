@@ -3,17 +3,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-struct Allocations * initAllocationMap(int p, int q)
+struct Allocations * initAllocationMap()
 {
     // Allocate memory
     struct Allocations * allocMap;
     allocMap = malloc(sizeof(struct Allocations));
 
     // Calculate sizes
-    allocMap->rows      = WORLD_HEIGHT / p;
-    allocMap->extraRows = WORLD_HEIGHT % p;
-    allocMap->cols      = WORLD_WIDTH  / q;
-    allocMap->extraCols = WORLD_WIDTH  % q; 
+    allocMap->rows      = WORLD_HEIGHT / P;
+    allocMap->extraRows = WORLD_HEIGHT % P;
+    allocMap->cols      = WORLD_WIDTH  / Q;
+    allocMap->extraCols = WORLD_WIDTH  % Q; 
 
     return allocMap;
 }
@@ -40,7 +40,6 @@ struct ProcessMap * initProcMap()
 
     return pMap;
 }
-
 
 struct NeighborRanks * calcNeighbors(int rank, struct ProcessMap * pMap)
 {
@@ -74,6 +73,89 @@ struct NeighborRanks * calcNeighbors(int rank, struct ProcessMap * pMap)
     neighbors->w  = pMap->map[selfi][((selfj + Q) - 1) % Q];
 
     return neighbors;
+}
+
+struct ProcessChunkInfo calcBoundaries(int rank, struct Allocations * pMap)
+{
+    struct ProcessChunkInfo pChunkInfo;
+    int procMapRow, procMapCol;
+    procMapRow = rank / Q;
+    procMapCol = rank % Q;
+
+    // Calculate row and column range
+    pChunkInfo.rowRange = pMap->rows;
+    if(procMapRow < pMap->extraRows)
+    {
+        pChunkInfo.rowRange += 1;
+    }
+    pChunkInfo.colRange = pMap->cols;
+    if(procMapCol < pMap->extraCols)
+    {
+        pChunkInfo.colRange += 1;
+    }
+    // Calculate row start
+    pChunkInfo.rowStart = procMapRow * pMap->rows;
+    if(procMapRow < pMap->extraRows)
+    {
+        pChunkInfo.rowStart += procMapRow;
+    }
+    else
+    {
+        pChunkInfo.rowStart += pMap->extraRows;
+    }
+    // Calculate column start
+    pChunkInfo.colStart = procMapCol * pMap->cols;
+    if(procMapCol < pMap->extraCols)
+    {
+        pChunkInfo.colStart += procMapCol;
+    }
+    else
+    {
+        pChunkInfo.colStart += pMap->extraCols;
+    }
+    // Calculate row and column end
+    pChunkInfo.rowEnd = (pChunkInfo.rowStart + pChunkInfo.rowRange) % WORLD_HEIGHT;
+    pChunkInfo.colEnd = (pChunkInfo.colStart + pChunkInfo.colRange) % WORLD_WIDTH;
+
+    return pChunkInfo;
+}
+
+struct ChunkHalos * initHalos(int rowRange, int colRange)
+{
+    struct ChunkHalos * halos;
+    halos = malloc(sizeof(struct ChunkHalos));
+
+    // Set sizes of halos
+    halos->eHaloSize = rowRange;
+    halos->wHaloSize = rowRange;
+    halos->nHaloSize = colRange;
+    halos->sHaloSize = colRange;
+
+    // Allocation memroy for halos
+    halos->eHalo  = malloc(sizeof(int) * halos->eHaloSize);
+    halos->wHalo  = malloc(sizeof(int) * halos->wHaloSize);
+    halos->nHalo  = malloc(sizeof(int) * halos->nHaloSize);
+    halos->sHalo  = malloc(sizeof(int) * halos->sHaloSize);
+    halos->neHalo = malloc(sizeof(int));
+    halos->nwHalo = malloc(sizeof(int));
+    halos->seHalo = malloc(sizeof(int));
+    halos->swHalo = malloc(sizeof(int));
+
+    return halos;
+}
+
+void deallocHalos(struct ChunkHalos * halos)
+{
+    free(halos->nHalo);
+    free(halos->sHalo);
+    free(halos->eHalo);
+    free(halos->wHalo);
+    free(halos->neHalo);
+    free(halos->nwHalo);
+    free(halos->seHalo);
+    free(halos->swHalo);
+    free(halos);
+    halos = NULL;
 }
 
 

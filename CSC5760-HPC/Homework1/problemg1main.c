@@ -10,13 +10,46 @@
 #include <stdlib.h>
 #include <unistd.h> // Needed for sleep()
 
+/* I'm not normally one for griping about an assignment, but I think something
+ * needs to be said about this one. I think the difficulty of this homework
+ * does not accurately reflect the fact that it is the first one of the
+ * semester; that is, I believe that it was inappropriate for the level of
+ * knowledge we currently have. Regardless of the fact that this is for the
+ * graduate-level section of this course, just about everyone in this class is
+ * still new to the concepts of parallel computing, and MPI is still a brand
+ * new library to us. Me, personally, I've had very limited experience with
+ * pthreads, and that's the extent of my knowledge about parallel computing.
+ * 
+ * I genuinely put my best effort into writing this program, but I've had course
+ * projects with fewer lines of source code than what I've put in here. I just
+ * wish there had been a more gradual introduction to MPI, and that the lectures
+ * had gone into more detail about what each function does and how it works.
+ * Some smaller  * code examples that we could pull from would also have been
+ * helpful. While the examples provided do have valuable information, they are
+ * monolithic and pretty intimidating to break down.
+ * 
+ * Again, I'm typically not the person who complains about an assignment, but
+ * I think this was a bit much for the first one of the semester.
+ */
+
 int main(int argc, char ** argv)
 {
+    int world[WORLD_WIDTH][WORLD_HEIGHT];
+    gliderDemo(world);
+
     // MPI Initialization
     int rank, size;
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    // Calculate how many extra rows and columns there are
+    struct Allocations * allocMap;
+    allocMap = initAllocationMap();
+    #ifdef DEBUG
+    printf("\nRows: %d, Extra: %d\nCols: %d, Extra: %d\n",
+           allocMap->rows, allocMap->extraRows, allocMap->cols, allocMap->extraCols);
+    #endif
     
     // Map processes to world
     int i, j;
@@ -43,27 +76,37 @@ int main(int argc, char ** argv)
     printf("\n%d %d %d", neighbors->sw, neighbors->s, neighbors->se);
     #endif
 
-
-    /*
-    // Setup world for testing
-    int world[WORLD_WIDTH][WORLD_HEIGHT];
-    initWorld(world);
-    gliderDemo(world);
-
-    struct Allocations * allocMap;
-    allocMap = initAllocationMap(P, Q);
+    // Calculate sub-world chunk sizes and allocate
+    struct ProcessChunkInfo pcInfo;
+    int ** subWorld;
+    pcInfo = calcBoundaries(rank, allocMap);
     #ifdef DEBUG
-    printf("[Allocation Map]\nRows: %d\nExtra Rows: %d\nCols: %d\nExtra Cols: %d",
-            allocMap->rows, allocMap->extraRows, allocMap->cols, allocMap->extraCols);
+    printf("\nRank: %d, Row Range: %d, Col Range: %d", rank, pcInfo.rowRange, pcInfo.colRange);
     #endif
+    subWorld = malloc(sizeof(int) * pcInfo.rowRange);
+    for(i = 0; i < pcInfo.colRange; i++)
+    {
+        subWorld[i] = malloc(sizeof(int) * pcInfo.colRange);
+    }
 
-    // Init MPI
-    MPI_Init(&argc, &argv);
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    */
+    // Setup halos for data from other processes
+    struct ChunkHalos * halos;
+    halos = initHalos(pcInfo.rowRange, pcInfo.colRange);
+
+    // Run game for n iterations
+    for(i = 0; i < ITERATIONS; i++)
+    {
+        // Update world if rank 0
+        if(rank == 0)
+        {
+            world[0][0] = 1;
+            i = world[0][0];
+        }
+    }
+
     // Cleanup
+    deallocAllocationMap(allocMap);
+    deallocHalos(halos);
     free(pMap);
     free(neighbors);
     MPI_Finalize();
