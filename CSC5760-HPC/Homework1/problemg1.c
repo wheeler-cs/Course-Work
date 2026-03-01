@@ -209,10 +209,10 @@ void exchangeHalos(int ** subWorld, struct ChunkHalos * halos, struct NeighborRa
     MPI_Isend(toSBuffer, halos->sHaloSize, MPI_INT, neighbors->s, TAG_NORTH, MPI_COMM_WORLD, &requests[9]);
     MPI_Isend(toEBuffer, halos->eHaloSize, MPI_INT, neighbors->e, TAG_WEST,  MPI_COMM_WORLD, &requests[10]);
     MPI_Isend(toWBuffer, halos->wHaloSize, MPI_INT, neighbors->w, TAG_EAST,  MPI_COMM_WORLD, &requests[11]);
-    MPI_Isend(&subWorld[0][0],                               1, MPI_INT, neighbors->nw, TAG_SOUTHEAST, MPI_COMM_WORLD, &requests[12]);
-    MPI_Isend(&subWorld[0][halos->nHaloSize],                1, MPI_INT, neighbors->ne, TAG_SOUTHWEST, MPI_COMM_WORLD, &requests[13]);
-    MPI_Isend(&subWorld[halos->eHaloSize][halos->nHaloSize], 1, MPI_INT, neighbors->se, TAG_NORTHWEST, MPI_COMM_WORLD, &requests[14]);
-    MPI_Isend(&subWorld[halos->eHaloSize][0],                1, MPI_INT, neighbors->sw, TAG_NORTHEAST, MPI_COMM_WORLD, &requests[15]);
+    MPI_Isend(&subWorld[1][1],                                       1, MPI_INT, neighbors->nw, TAG_SOUTHEAST, MPI_COMM_WORLD, &requests[12]);
+    MPI_Isend(&subWorld[1][halos->nHaloSize + 1],                    1, MPI_INT, neighbors->ne, TAG_SOUTHWEST, MPI_COMM_WORLD, &requests[13]);
+    MPI_Isend(&subWorld[halos->eHaloSize + 1][halos->nHaloSize + 1], 1, MPI_INT, neighbors->se, TAG_NORTHWEST, MPI_COMM_WORLD, &requests[14]);
+    MPI_Isend(&subWorld[halos->eHaloSize + 1][1],                    1, MPI_INT, neighbors->sw, TAG_NORTHEAST, MPI_COMM_WORLD, &requests[15]);
 
     // Wait for send to finish
     MPI_Waitall(16, requests, MPI_STATUSES_IGNORE);
@@ -222,6 +222,92 @@ void exchangeHalos(int ** subWorld, struct ChunkHalos * halos, struct NeighborRa
     free(toSBuffer);
     free(toEBuffer);
     free(toWBuffer);
+}
+
+void updateSubWorld(int ** subWorld, struct ChunkHalos * halos, struct ProcessChunkInfo * pcInfo)
+{
+    // Function variables
+    int i, j;
+    int ** worldCopy;
+    
+    // Allocate memory for temporary world
+    worldCopy = malloc(sizeof(int *) * (pcInfo->rowRange + 2));
+
+    for(i = 0; i < pcInfo->rowRange + 2; i++)
+    {
+        worldCopy[i] = malloc(sizeof(int) * (pcInfo->colRange + 2));
+    }
+
+    // Copy corner halos to subworld
+    subWorld[0][0] = *(halos->nwHalo);                               // NW
+    subWorld[0][pcInfo->colRange] = *(halos->neHalo);                // NE
+    subWorld[pcInfo->rowRange][0] = *(halos->swHalo);                // SW
+    subWorld[pcInfo->rowRange][pcInfo->colRange] = *(halos->seHalo); // SE
+    // Copy cells from cardinal direction halos
+    for(i = 0; i < halos->nHaloSize; i++) // North
+    {
+        subWorld[0][i + 1] = halos->nHalo[i];
+    }
+    for(i = 0; i < halos->sHaloSize; i++) // South
+    {
+        subWorld[pcInfo->rowRange - 1][i + 1] = halos->sHalo[i];
+    }
+    for(i = 0; i < halos->eHaloSize; i++) // East
+    {
+        subWorld[i + 1][pcInfo->colRange - 1] = halos->eHalo[i];
+    }
+    for(i = 0; i < halos->wHaloSize; i++) // West
+    {
+        subWorld[i + 1][0] = halos->wHalo[i];
+    }
+    
+    // Perform actual update on world
+    for(i = 0; i < pcInfo->rowRange; i++)
+    {
+        for(j = 0; j < pcInfo->colRange; j++)
+        {
+            worldCopy[i + 1][j + 1] = isCellAlive(i + 1, j + 1, subWorld);
+        }
+    }
+
+    // Transfer copy to real world
+    for(i = 0; i < pcInfo->rowRange + 2; i++)
+    {
+        for(j = 0; j < pcInfo->colRange + 2; j++)
+        {
+            subWorld[i][j] = worldCopy[i][j];
+        }
+    }
+
+    // Cleanup
+    for(i = 0; i < pcInfo->rowRange + 2; i++)
+    {
+        free(worldCopy[i]);
+        worldCopy[i] = NULL;
+    }
+    free(worldCopy);
+    worldCopy = NULL;
+}
+
+void printSubworld(int ** subWorld, struct ProcessChunkInfo * pcInfo)
+{
+    int i, j;
+    printf("\n\n");
+    for(j = pcInfo->rowRange + 1; j >= 0; j--)
+    {
+        for(i = 0; i < pcInfo->colRange + 2; i++)
+        {
+            if(subWorld[j][i] == STATE_ALIVE)
+            {
+                printf("*");
+            }
+            else
+            {
+                printf("-");
+            }
+        }
+        printf("\n");
+    } 
 }
 
 
@@ -237,9 +323,9 @@ void initWorld(int world[WORLD_WIDTH][WORLD_HEIGHT])
     }
 }
 
-int isCellAlive(int x, int y, int world[WORLD_WIDTH][WORLD_HEIGHT])
+int isCellAlive(int r, int c, int ** world)
 {
-    int neighbors, i, j, xOffset, yOffset;
+    int neighbors, i, j, neighborRow, neighborCol;
     neighbors = 0;
     // Check 3 x 3 box around 
     for(i = -1; i <= 1; i++)
@@ -251,16 +337,16 @@ int isCellAlive(int x, int y, int world[WORLD_WIDTH][WORLD_HEIGHT])
             {
                 continue;
             }
-            // Check cell state, being mindful of wrapping
-            xOffset = ((x + WORLD_WIDTH) + i) % WORLD_WIDTH;
-            yOffset = ((y + WORLD_HEIGHT) + j) % WORLD_HEIGHT;
-            if(world[xOffset][yOffset] == STATE_ALIVE)
+            // Check cell state
+            neighborRow = (r + i);
+            neighborCol = (c + j);
+            if(world[neighborRow][neighborCol] == STATE_ALIVE)
             {
                 neighbors++;
             }
         }
     }
-    if(world[x][y] == STATE_ALIVE)
+    if(world[r][c] == STATE_ALIVE)
     {
         // If alive @ t, is alive @ t + 1 if has 2 or 3 neighbors
         if(neighbors != 2 && neighbors != 3)
@@ -286,11 +372,11 @@ int isCellAlive(int x, int y, int world[WORLD_WIDTH][WORLD_HEIGHT])
     }
 }
 
-void blinkerDemo(int world[WORLD_WIDTH][WORLD_HEIGHT])
+void blinkerDemo(int ** world)
 {
-    world[0][0] = STATE_ALIVE;
-    world[0][1] = STATE_ALIVE;
-    world[0][2] = STATE_ALIVE;
+    world[2][2] = STATE_ALIVE;
+    world[2][3] = STATE_ALIVE;
+    world[2][4] = STATE_ALIVE;
 }
 
 void beaconDemo(int world[WORLD_WIDTH][WORLD_HEIGHT])
@@ -303,8 +389,9 @@ void beaconDemo(int world[WORLD_WIDTH][WORLD_HEIGHT])
     world[3][2] = STATE_ALIVE;
 }
 
-void gliderDemo(int world[WORLD_WIDTH][WORLD_HEIGHT])
+void gliderDemo(int ** world)
 {
+    DBGPRINT("Setting up glider demo")
     world[2][2] = STATE_ALIVE;
     world[3][2] = STATE_ALIVE;
     world[4][2] = STATE_ALIVE;
@@ -322,7 +409,7 @@ void updateWorld(int world[WORLD_WIDTH][WORLD_HEIGHT])
         for(j = 0; j < WORLD_HEIGHT; j++)
         {
             // Save cell state to a world copy
-            worldCopy[i][j] = isCellAlive(i, j, world);
+            //worldCopy[i][j] = isCellAlive(i, j, world);
         }
     }
     // Transfer from copy to actual world
@@ -349,9 +436,10 @@ void printWorld(int world[WORLD_WIDTH][WORLD_HEIGHT])
             }
             else
             {
-                printf(" ");
+                printf("-");
             }
         }
         printf("\n");
     }
+    fflush(stdout);
 }

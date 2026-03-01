@@ -1,7 +1,19 @@
 #ifndef _PROBLEMG1_H
 #define _PROBLEMG1_H
 
+#include <stdlib.h>
+
 #define DEBUG
+
+#ifdef DEBUG
+#define DBGPRINT(...) \
+        printf("\n[DEBUG] "); \
+        printf(__VA_ARGS__); \
+        fflush(stdout);
+#else
+// Disable debug printing if undefined
+#define DBGPRINT(...)
+#endif
 
 #define WORLD_WIDTH 21
 #define WORLD_HEIGHT 10
@@ -87,13 +99,16 @@ struct ChunkHalos * initHalos(int, int);
 void deallocHalos(struct ChunkHalos *);
 void exchangeHalos(int **, struct ChunkHalos *, struct NeighborRanks *);
 
+void updateSubWorld(int **, struct ChunkHalos *, struct ProcessChunkInfo *);
+int isCellAlive(int, int, int **);
+
+void blinkerDemo(int **);
+void gliderDemo(int **);
+void printSubworld(int **, struct ProcessChunkInfo *);
 
 // Code for Game of Life logic
 void initWorld(int [WORLD_WIDTH][WORLD_HEIGHT]);
-int isCellAlive(int, int, int [WORLD_WIDTH][WORLD_HEIGHT]);
-void blinkerDemo(int [WORLD_WIDTH][WORLD_HEIGHT]);
 void beaconDemo(int [WORLD_WIDTH][WORLD_HEIGHT]);
-void gliderDemo(int [WORLD_WIDTH][WORLD_HEIGHT]);
 void updateWorld(int [WORLD_WIDTH][WORLD_HEIGHT]);
 void printWorld(int [WORLD_WIDTH][WORLD_HEIGHT]);
 

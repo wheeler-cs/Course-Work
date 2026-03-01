@@ -35,7 +35,6 @@
 int main(int argc, char ** argv)
 {
     int world[WORLD_WIDTH][WORLD_HEIGHT];
-    gliderDemo(world);
 
     // MPI Initialization
     int rank, size;
@@ -69,42 +68,44 @@ int main(int argc, char ** argv)
     // Map process neighbors
     struct NeighborRanks * neighbors;
     neighbors = calcNeighbors(rank, pMap);
-    #ifdef DEBUG
-    printf("\n\n[Neighbors of %d]", rank);
-    printf("\n%d %d %d", neighbors->nw, neighbors->n, neighbors->ne);
-    printf("\n%d %d %d", neighbors->w, rank, neighbors->e);
-    printf("\n%d %d %d", neighbors->sw, neighbors->s, neighbors->se);
-    #endif
+    DBGPRINT("\n\n[Neighbors of %d]", rank);
+    DBGPRINT("\n%d %d %d", neighbors->nw, neighbors->n, neighbors->ne);
+    DBGPRINT("\n%d %d %d", neighbors->w, rank, neighbors->e);
+    DBGPRINT("\n%d %d %d", neighbors->sw, neighbors->s, neighbors->se);
 
     // Calculate sub-world chunk sizes and allocate
     struct ProcessChunkInfo pcInfo;
     int ** subWorld;
     pcInfo = calcBoundaries(rank, allocMap);
-    #ifdef DEBUG
-    printf("\nRank: %d, Row Range: %d, Col Range: %d", rank, pcInfo.rowRange, pcInfo.colRange);
-    #endif
-    subWorld = malloc(sizeof(int) * pcInfo.rowRange);
-    for(i = 0; i < pcInfo.colRange; i++)
+    subWorld = malloc(sizeof(int *) * (pcInfo.rowRange + 2));
+    for(i = 0; i < pcInfo.rowRange + 2; i++)
     {
-        subWorld[i] = malloc(sizeof(int) * pcInfo.colRange);
+        subWorld[i] = malloc(sizeof(int) * (pcInfo.colRange + 2));
     }
 
     // Setup halos for data from other processes
     struct ChunkHalos * halos;
     halos = initHalos(pcInfo.rowRange, pcInfo.colRange);
 
+    if(rank == 0)
+    {
+        blinkerDemo(subWorld);
+    }
     // Run game for n iterations
     for(i = 0; i < ITERATIONS; i++)
     {
         exchangeHalos(subWorld, halos, neighbors);
+        updateSubWorld(subWorld, halos, &pcInfo);
 
         // Update world if rank 0
         if(rank == 0)
         {
-            world[0][0] = 1;
-            printWorld(world);
+            clearScreen();
+            setCursorPosition(1, 1);
+            DBGPRINT("Printing iteration [%d]", i + 1)
+            printSubworld(subWorld, &pcInfo);
+            sleep(1);
         }
-        sleep(0.5);
     }
 
     // Cleanup
@@ -113,7 +114,10 @@ int main(int argc, char ** argv)
     free(pMap);
     free(neighbors);
     MPI_Finalize();
-    printf("\n");
+    if(rank == 0)
+    {
+        printf("\n");
+    }
 
     return 0;
 }
