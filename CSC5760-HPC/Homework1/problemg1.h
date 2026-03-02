@@ -15,8 +15,8 @@
 #define DBGPRINT(...)
 #endif
 
-#define WORLD_WIDTH 21
-#define WORLD_HEIGHT 10
+#define WORLD_WIDTH 79
+#define WORLD_HEIGHT 49
 
 // P * Q = Num of processes
 #define P 2
@@ -109,19 +109,17 @@ void deallocHalos(struct ChunkHalos *);
 void exchangeHalos(int **, struct ChunkHalos *, struct NeighborRanks *);
 
 void updateSubWorld(int **, struct ChunkHalos *, struct ProcessChunkInfo *);
-int isCellAlive(int, int, int **);
 
-void blinkerDemo(int **);
-void gliderDemo(int **);
 void printSubworld(int **, struct ProcessChunkInfo *);
 
 void aggregateSubWorlds(int [WORLD_HEIGHT][WORLD_WIDTH], struct ProcessMap *);
 void forwardSubWorld(int **, struct ProcessChunkInfo *);
 void applySubWorld(int [WORLD_HEIGHT][WORLD_WIDTH], int **, struct ProcessChunkInfo *);
 
-// Code for Game of Life logic
 void initWorld(int [WORLD_HEIGHT][WORLD_WIDTH]);
-void beaconDemo(int [WORLD_WIDTH][WORLD_HEIGHT]);
+int isCellAlive(int, int, int **);
+void blinkerDemo(int **);
+void gliderDemo(int **);
 void printWorld(int [WORLD_HEIGHT][WORLD_WIDTH]);
 
 

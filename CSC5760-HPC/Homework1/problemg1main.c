@@ -48,7 +48,7 @@ int main(int argc, char ** argv)
     allocMap = initAllocationMap();
     
     // Map processes to world
-    int i;
+    int i, j;
     struct ProcessMap * pMap;
     pMap = initProcMap();
 
@@ -60,10 +60,19 @@ int main(int argc, char ** argv)
     struct ProcessChunkInfo pcInfo;
     int ** subWorld;
     pcInfo = calcBoundaries(rank, allocMap);
+    // Allocate memory for local world chunk
     subWorld = malloc(sizeof(int *) * (pcInfo.rowRange + 2));
     for(i = 0; i < pcInfo.rowRange + 2; i++)
     {
         subWorld[i] = malloc(sizeof(int) * (pcInfo.colRange + 2));
+    }
+    // Blank-init elements in local world
+    for(i = 0; i < pcInfo.rowRange + 2; i++)
+    {
+        for(j = 0; j < pcInfo.colRange + 2; j++)
+        {
+            subWorld[i][j] = STATE_DEAD;
+        }
     }
 
     // Setup halos for data from other processes
@@ -91,6 +100,7 @@ int main(int argc, char ** argv)
             printWorld(world);
             sleep(1); // Sleep so user can see updates in terminal
         }
+        // All other ranks forward world state to 0
         else
         {
             forwardSubWorld(subWorld, &pcInfo);
@@ -100,6 +110,11 @@ int main(int argc, char ** argv)
     // Cleanup
     deallocAllocationMap(allocMap);
     deallocHalos(halos);
+    for(i = 0; i < pcInfo.rowRange; i++)
+    {
+        free(subWorld[i]);
+    }
+    free(subWorld);
     free(pMap);
     free(neighbors);
     MPI_Finalize();

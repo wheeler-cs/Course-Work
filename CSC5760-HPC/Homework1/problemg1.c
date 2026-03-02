@@ -163,13 +163,13 @@ void deallocHalos(struct ChunkHalos * halos)
 
 void exchangeHalos(int ** subWorld, struct ChunkHalos * halos, struct NeighborRanks * neighbors)
 {
-    // Create buffers for sending data
     MPI_Request requests[16];
+    int i;
+    // Create buffers for sending data
     int * toNBuffer,
         * toSBuffer,
         * toEBuffer,
         * toWBuffer;
-    int i;
     toNBuffer = malloc(sizeof(int) * halos->nHaloSize);
     toSBuffer = malloc(sizeof(int) * halos->sHaloSize);
     toEBuffer = malloc(sizeof(int) * halos->eHaloSize);
@@ -185,7 +185,7 @@ void exchangeHalos(int ** subWorld, struct ChunkHalos * halos, struct NeighborRa
     MPI_Irecv(halos->seHalo, 1,                MPI_INT, neighbors->se, TAG_SOUTHEAST, MPI_COMM_WORLD, &requests[6]);
     MPI_Irecv(halos->swHalo, 1,                MPI_INT, neighbors->sw, TAG_SOUTHWEST, MPI_COMM_WORLD, &requests[7]);
 
-    // Copy data from chunk to buffers
+    // Copy data to send from chunk to buffers
     for(i = 0; i < halos->nHaloSize; i++)
     {
         toNBuffer[i] = subWorld[0][i];
@@ -324,9 +324,9 @@ void aggregateSubWorlds(int world[WORLD_HEIGHT][WORLD_WIDTH], struct ProcessMap 
             {
                 continue;
             }
-            // Force receiving of height and width first to know how much memory to allocate
             MPI_Recv(&subWorldRowOrigin, 1, MPI_INT, pMap->map[i][j], TAG_SUBWORLD_ROW_ORIGIN, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             MPI_Recv(&subWorldColOrigin, 1, MPI_INT, pMap->map[i][j], TAG_SUBWORLD_COL_ORIGIN, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // Force blocking receive for height and width to know how big world is
             MPI_Recv(&subWorldHeight, 1, MPI_INT, pMap->map[i][j], TAG_SUBWORLD_HEIGHT, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             MPI_Recv(&subWorldWidth, 1, MPI_INT, pMap->map[i][j], TAG_SUBWORLD_WIDTH, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             // Allocate memory for map and receive data
@@ -449,19 +449,10 @@ int isCellAlive(int r, int c, int ** world)
 
 void blinkerDemo(int ** world)
 {
+    DBGPRINT("Setting up blinker demo")
     world[2][2] = STATE_ALIVE;
     world[2][3] = STATE_ALIVE;
     world[2][4] = STATE_ALIVE;
-}
-
-void beaconDemo(int world[WORLD_WIDTH][WORLD_HEIGHT])
-{
-    world[0][0] = STATE_ALIVE;
-    world[0][1] = STATE_ALIVE;
-    world[1][0] = STATE_ALIVE;
-    world[2][3] = STATE_ALIVE;
-    world[3][3] = STATE_ALIVE;
-    world[3][2] = STATE_ALIVE;
 }
 
 void gliderDemo(int ** world)
