@@ -34,7 +34,8 @@
 
 int main(int argc, char ** argv)
 {
-    int world[WORLD_WIDTH][WORLD_HEIGHT];
+    int world[WORLD_HEIGHT][WORLD_WIDTH];
+    initWorld(world);
 
     // MPI Initialization
     int rank, size;
@@ -45,33 +46,15 @@ int main(int argc, char ** argv)
     // Calculate how many extra rows and columns there are
     struct Allocations * allocMap;
     allocMap = initAllocationMap();
-    #ifdef DEBUG
-    printf("\nRows: %d, Extra: %d\nCols: %d, Extra: %d\n",
-           allocMap->rows, allocMap->extraRows, allocMap->cols, allocMap->extraCols);
-    #endif
     
     // Map processes to world
-    int i, j;
+    int i;
     struct ProcessMap * pMap;
     pMap = initProcMap();
-    #ifdef DEBUG
-    for(i = 0; i < P; i++)
-    {
-        printf("\n");
-        for(j = 0; j < Q; j++)
-        {
-            printf("%d ", pMap->map[i][j]);
-        }
-    }
-    #endif
 
     // Map process neighbors
     struct NeighborRanks * neighbors;
     neighbors = calcNeighbors(rank, pMap);
-    DBGPRINT("\n\n[Neighbors of %d]", rank);
-    DBGPRINT("\n%d %d %d", neighbors->nw, neighbors->n, neighbors->ne);
-    DBGPRINT("\n%d %d %d", neighbors->w, rank, neighbors->e);
-    DBGPRINT("\n%d %d %d", neighbors->sw, neighbors->s, neighbors->se);
 
     // Calculate sub-world chunk sizes and allocate
     struct ProcessChunkInfo pcInfo;
@@ -100,11 +83,17 @@ int main(int argc, char ** argv)
         // Update world if rank 0
         if(rank == 0)
         {
+            aggregateSubWorlds(world, pMap);
+            applySubWorld(world, subWorld, &pcInfo);
             clearScreen();
             setCursorPosition(1, 1);
             DBGPRINT("Printing iteration [%d]", i + 1)
-            printSubworld(subWorld, &pcInfo);
-            sleep(1);
+            printWorld(world);
+            sleep(1); // Sleep so user can see updates in terminal
+        }
+        else
+        {
+            forwardSubWorld(subWorld, &pcInfo);
         }
     }
 

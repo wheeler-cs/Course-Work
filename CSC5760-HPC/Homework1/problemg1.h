@@ -36,6 +36,15 @@ enum ReceiveTag
     TAG_SOUTHWEST,
 };
 
+enum WorldUpdateTag
+{
+    TAG_SUBWORLD_HEIGHT,
+    TAG_SUBWORLD_WIDTH,
+    TAG_SUBWORLD_ROW_ORIGIN,
+    TAG_SUBWORLD_COL_ORIGIN,
+    TAG_SUBWORLD_DATA,
+};
+
 enum CellState
 {
     STATE_DEAD,
@@ -106,11 +115,14 @@ void blinkerDemo(int **);
 void gliderDemo(int **);
 void printSubworld(int **, struct ProcessChunkInfo *);
 
+void aggregateSubWorlds(int [WORLD_HEIGHT][WORLD_WIDTH], struct ProcessMap *);
+void forwardSubWorld(int **, struct ProcessChunkInfo *);
+void applySubWorld(int [WORLD_HEIGHT][WORLD_WIDTH], int **, struct ProcessChunkInfo *);
+
 // Code for Game of Life logic
-void initWorld(int [WORLD_WIDTH][WORLD_HEIGHT]);
+void initWorld(int [WORLD_HEIGHT][WORLD_WIDTH]);
 void beaconDemo(int [WORLD_WIDTH][WORLD_HEIGHT]);
-void updateWorld(int [WORLD_WIDTH][WORLD_HEIGHT]);
-void printWorld(int [WORLD_WIDTH][WORLD_HEIGHT]);
+void printWorld(int [WORLD_HEIGHT][WORLD_WIDTH]);
 
 
 #endif

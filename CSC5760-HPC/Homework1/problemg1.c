@@ -310,13 +310,88 @@ void printSubworld(int ** subWorld, struct ProcessChunkInfo * pcInfo)
     } 
 }
 
+void aggregateSubWorlds(int world[WORLD_HEIGHT][WORLD_WIDTH], struct ProcessMap * pMap)
+{
+    int i, j, k, l,
+        subWorldRowOrigin, subWorldColOrigin,
+        subWorldHeight, subWorldWidth,
+        * tempSubWorld;
+    for(i = 0; i < P; i++)
+    {
+        for(j = 0; j < Q; j++)
+        {
+            if(pMap->map[i][j] == 0)
+            {
+                continue;
+            }
+            // Force receiving of height and width first to know how much memory to allocate
+            MPI_Recv(&subWorldRowOrigin, 1, MPI_INT, pMap->map[i][j], TAG_SUBWORLD_ROW_ORIGIN, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&subWorldColOrigin, 1, MPI_INT, pMap->map[i][j], TAG_SUBWORLD_COL_ORIGIN, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&subWorldHeight, 1, MPI_INT, pMap->map[i][j], TAG_SUBWORLD_HEIGHT, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&subWorldWidth, 1, MPI_INT, pMap->map[i][j], TAG_SUBWORLD_WIDTH, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // Allocate memory for map and receive data
+            tempSubWorld = malloc(sizeof(int) * subWorldHeight * subWorldWidth);
+            MPI_Recv(tempSubWorld, subWorldHeight * subWorldWidth, MPI_INT, pMap->map[i][j], TAG_SUBWORLD_DATA, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // Copy over world data
+            for(k = subWorldRowOrigin; k < subWorldHeight; k++)
+            {
+                for(l = subWorldColOrigin; l < subWorldWidth; l++)
+                {
+                    world[(i * subWorldHeight) + k][(j * subWorldWidth) + l] = tempSubWorld[(k * subWorldHeight) + l];
+                }
+            }
+            free(tempSubWorld);
+        }
+    }
+}
 
-void initWorld(int world[WORLD_WIDTH][WORLD_HEIGHT])
+void forwardSubWorld(int ** subWorld, struct ProcessChunkInfo * pcInfo)
+{
+    MPI_Request requests[5];
+    int i, j,
+      * flatWorld;
+
+    // Flatten subworld into contiguous memory
+    flatWorld = malloc(sizeof(int) * (pcInfo->rowRange) * (pcInfo->colRange));
+    for(i = 1; i < pcInfo->rowRange - 1; i++)
+    {
+        for(j = 1; j < pcInfo->colRange - 1; j++)
+        {
+            flatWorld[(i * pcInfo->colRange) + j] = subWorld[i][j];
+        }
+    }
+
+    // Send all data at once and await for completion
+    MPI_Isend(&(pcInfo->rowStart), 1, MPI_INT, 0, TAG_SUBWORLD_ROW_ORIGIN, MPI_COMM_WORLD, &requests[0]);
+    MPI_Isend(&(pcInfo->colStart), 1, MPI_INT, 0, TAG_SUBWORLD_COL_ORIGIN, MPI_COMM_WORLD, &requests[1]);
+    MPI_Isend(&(pcInfo->rowRange), 1, MPI_INT, 0, TAG_SUBWORLD_HEIGHT, MPI_COMM_WORLD, &requests[2]);
+    MPI_Isend(&(pcInfo->colRange), 1, MPI_INT, 0, TAG_SUBWORLD_WIDTH, MPI_COMM_WORLD, &requests[3]);
+    MPI_Isend(flatWorld, (pcInfo->rowRange) * (pcInfo->colRange), MPI_INT, 0, TAG_SUBWORLD_DATA, MPI_COMM_WORLD, &requests[4]);
+    MPI_Waitall(5, requests, MPI_STATUSES_IGNORE);
+
+    // Cleanup
+    free(flatWorld);
+}
+
+void applySubWorld(int world[WORLD_HEIGHT][WORLD_WIDTH], int ** subWorld, struct ProcessChunkInfo * pcInfo)
 {
     int i, j;
-    for(i = 0; i < WORLD_WIDTH; i++)
+    for(i = 1; i < pcInfo->rowRange; i++)
     {
-        for(j = 0; j < WORLD_HEIGHT; j++)
+        for(j = 1; j < pcInfo->colRange; j++)
+        {
+            world[i + pcInfo->rowStart][j + pcInfo->colStart] = subWorld[i][j];
+        }
+    }
+}
+
+
+void initWorld(int world[WORLD_HEIGHT][WORLD_WIDTH])
+{
+    int i, j;
+    for(i = 0; i < WORLD_HEIGHT; i++)
+    {
+        for(j = 0; j < WORLD_WIDTH; j++)
         {
             world[i][j] = STATE_DEAD;
         }
@@ -392,37 +467,14 @@ void beaconDemo(int world[WORLD_WIDTH][WORLD_HEIGHT])
 void gliderDemo(int ** world)
 {
     DBGPRINT("Setting up glider demo")
-    world[2][2] = STATE_ALIVE;
-    world[3][2] = STATE_ALIVE;
-    world[4][2] = STATE_ALIVE;
-    world[4][3] = STATE_ALIVE;
-    world[3][4] = STATE_ALIVE;
+    world[0][0] = STATE_ALIVE;
+    world[0][1] = STATE_ALIVE;
+    world[0][2] = STATE_ALIVE;
+    world[1][2] = STATE_ALIVE;
+    world[2][0] = STATE_ALIVE;
 }
 
-void updateWorld(int world[WORLD_WIDTH][WORLD_HEIGHT])
-{
-    int i, j;
-    int worldCopy[WORLD_WIDTH][WORLD_HEIGHT];
-    // Check cell states
-    for(i = 0; i < WORLD_WIDTH; i++)
-    {
-        for(j = 0; j < WORLD_HEIGHT; j++)
-        {
-            // Save cell state to a world copy
-            //worldCopy[i][j] = isCellAlive(i, j, world);
-        }
-    }
-    // Transfer from copy to actual world
-    for(i = 0; i < WORLD_WIDTH; i++)
-    {
-        for(j = 0; j < WORLD_HEIGHT; j++)
-        {
-            world[i][j] = worldCopy[i][j];
-        }
-    }
-}
-
-void printWorld(int world[WORLD_WIDTH][WORLD_HEIGHT])
+void printWorld(int world[WORLD_HEIGHT][WORLD_WIDTH])
 {
     int i, j;
     printf("\n");
@@ -430,7 +482,7 @@ void printWorld(int world[WORLD_WIDTH][WORLD_HEIGHT])
     {
         for(i = 0; i < WORLD_WIDTH; i++)
         {
-            if(world[i][j] == STATE_ALIVE)
+            if(world[j][i] == STATE_ALIVE)
             {
                 printf("*");
             }

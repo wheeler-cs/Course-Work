@@ -4,6 +4,10 @@
  * processes with MPI COMM WORLD. The integer should start at 0 in process 0 and be incremented each
  * time it passes around the ring, and you should be able to have the message go around the ring N
  * times, where N is specified at compile time.
+ * 
+ * LLM structued code with if-else on out side and for loop on inside, while code I wrote has the
+ * for loop on the outside and the if-else statements on the inside. LLM code is also monolithic
+ * where mine is built using functions.
  */
 
 
