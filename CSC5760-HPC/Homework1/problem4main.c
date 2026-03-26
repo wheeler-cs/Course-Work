@@ -8,6 +8,11 @@
  * (week of February 16). Use MPI Wtime() to measure the cost of the operation as you vary P and N .
  * We will explain how to use this operation in lecture. Use easy-to-evaluate data for testing in
  * the vector elements for correctness testing (but not all zeroes).
+ * 
+ * LLM code has error handling for arguments passed into MPI. Additionally, it uses a function for
+ * calculating the start and end of subvectors that are divided across multiple processes. There is
+ * also the presences of barriers to force syncing across processes for certain operations are
+ * performed. Structure of tree reductions are similar between the LLM code and my code.
  */
 
 
