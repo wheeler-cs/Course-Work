@@ -5,3 +5,6 @@ __pycache__/
 
 # Visual Studio Code-Related Files and Directories
 .vscode/
+
+# Compilation artifacts
+a.out
